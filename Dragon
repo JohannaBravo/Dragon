@@ -1,0 +1,206 @@
+float dt = 1/15.0; //rapidez de la particula
+PVector gravedad = new PVector(0, 0);
+ArrayList<Cohete> cohetes;
+
+
+// Lista de colores que podrán tener los cohetes
+color colores = color(255,150,50);
+
+// Variables para explosión radial
+float angExpRadial = 0.0;
+int numRadial = 0;
+int iRadial = 0;
+
+// Variables para explosión circular
+float angExpCircular = 0.0;
+
+// Variables para explosión multicircular
+float angExpMulticircular = 0.0;
+int numMulticircular = 0;
+int iMulticircular = 0;
+
+// Variables para explosión espiral
+
+
+// Tipos de cohete según su comportamiento
+final int CASQUETE = 0;
+final int RADIAL = 1;
+final int CIRCULAR = 2;
+final int MULTICIRCULAR = 3;
+final int ESPIRAL = 4;
+final int MULTIESPIRAL = 5;
+final int RANDOM = 6;
+final int MIX = 7;
+
+int tipoExplosion = MIX;
+String nombreTipoExplosion = "Mix";
+int timer=1;
+
+PImage fondo, dragon1, dragon2;
+
+void setup() {
+   size(900,600);
+  
+   fondo    = loadImage("Data/noche.jpg");
+   dragon2  = loadImage("Data/Dragon2.png");
+   cohetes  = new ArrayList<Cohete>();
+ 
+}
+
+void draw() {
+  background(random(100,255), random(0,255),  random(0,255));
+  image(dragon2,300,150);
+  for (int i=0; i < cohetes.size(); i++) {
+    Cohete c = cohetes.get(i);
+    c.correr();
+    if (c.termina()) {
+        cohetes.remove(i);
+      }
+   } 
+  if(timer%10==0){
+    PVector pos = new PVector(random(200), 130); //posicion
+    PVector origen = new PVector(width/2.5, height/1.8);  //de donde salen los cohetes
+    Cohete c = new Cohete(pos, 100, tipoExplosion, colores,origen);
+    cohetes.add(c);
+  }
+  else if (timer%17==0)  { 
+    timer=0;
+    PVector pos = new PVector(random(200), 130); //posicion
+    PVector origen = new PVector(0, 0);  //de donde salen los cohetes
+    Cohete c = new Cohete(pos, 100, tipoExplosion, color(0,0,100),origen);
+    cohetes.add(c);
+  } 
+  timer++;
+}
+class Cohete {
+  sistemaDeParticulas sdp;  //Cuerpo
+  Particula casquete;
+  int time2die;
+  PVector origen;
+  int tipo;
+  color col;
+  Cohete(PVector p, int t, int tp, color cl, PVector o) {
+    origen = o;
+    casquete = new Particula(origen, CASQUETE, color(#FFFBAF));
+    PVector dir = PVector.sub(p, origen);
+    dir.normalize();
+    dir.mult(random(35,0));  //rango donde explotan los cohetes en funcion de "x" y "y"
+    casquete.velocidad = dir;
+    casquete.duracion = 900;
+    time2die =  t; //tiempo de muerte
+    tipo = tp;
+    col = cl;  //color
+  }
+  
+  void correr() {
+    if (time2die == 0) {
+      casquete.duracion = 0;
+      sdp = new sistemaDeParticulas(casquete.ubicacion);
+      explosion();
+    }
+    
+    casquete.correr();
+    if (sdp != null)
+      sdp.correr();
+    time2die -= 1;
+  }
+  
+  void explosion() {
+    int cantidad;
+     cantidad = 15;
+    for (int i=0; i < cantidad; i++) {
+      sdp.agregarParticula(tipo, col);
+    }
+  }
+  
+  boolean termina() {
+    if (sdp != null && sdp.particulas.size() == 0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+// Una simple clase Partícula
+class Particula {
+  PVector ubicacion;
+  PVector velocidad;
+  PVector aceleracion;
+  float duracion;
+  float masa = 2.0;
+  int tipo;
+  color col;
+  Particula(PVector l, int tp, color cl) {
+        aceleracion = new PVector(0, 0);
+        tipo = tp;
+        numRadial = iRadial%30;
+        angExpRadial = TWO_PI/30*numRadial;
+        velocidad = new PVector(cos(angExpRadial), sin(angExpRadial));
+        velocidad.mult(random(1, 20));
+        iRadial += 1;
+        ubicacion = l.get();
+        duracion = 200.0;  //duracion de la explosion
+        col = cl;
+  }
+
+  void correr() {
+    actualizar();
+    mostrar();
+  }
+
+  // Metodo de actualización de la ubicacion
+  void actualizar() {
+    aplicarFuerza(PVector.mult(gravedad, masa));
+    velocidad = PVector.add(PVector.mult(aceleracion, dt), velocidad);
+    ubicacion = PVector.add(PVector.mult(velocidad, dt), ubicacion);
+    duracion -= 1.0; //duracion de salida del cohete    
+    aceleracion.set(0.0, 0.0);
+  }
+  void aplicarFuerza(PVector fuerza) {
+    PVector f = fuerza.get();
+    f.div(masa);
+    aceleracion.add(f);
+  }
+
+  // Metodo para mostrar
+  void mostrar() {
+    stroke(col, duracion);
+    fill(col, duracion);
+    ellipse(ubicacion.x, ubicacion.y, 8, 8); //tamaño del cohete
+  }
+  
+  // ¿La particula sigue siendo util?
+  boolean termina() {
+    if (duracion < 0.0) {
+      return true;
+    } else {
+      return false;
+    }
+  }
+}
+// Una clase para describir un grupo de particulas
+// Se utiliza una lista de arreglo para administrar la lista de partículas
+class sistemaDeParticulas { //sistema de particulas
+  ArrayList<Particula> particulas;
+  PVector origen;
+
+  sistemaDeParticulas(PVector ubicacion) {
+    origen = ubicacion.get();
+    particulas = new ArrayList<Particula>();
+  }
+
+  void agregarParticula(int tipo, color cl) {
+    particulas.add(new Particula(origen, tipo, cl));
+
+  }
+
+  void correr() {
+    for (int i = particulas.size()-1; i >= 0; i--) {
+      Particula p = particulas.get(i);
+      p.correr();
+      if (p.termina()) {
+        particulas.remove(i);
+      }
+    }
+  }
+}
